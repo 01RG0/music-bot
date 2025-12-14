@@ -1,7 +1,7 @@
-import { Client } from 'discord-oauth2';
+import DiscordOauth2 from 'discord-oauth2';
 import { botConfig } from '@music/config';
 
-export const discordOAuth = new Client({
+export const discordOAuth = new DiscordOauth2({
   clientId: botConfig.clientId!,
   clientSecret: botConfig.clientSecret!,
   redirectUri: botConfig.redirectUri
@@ -31,9 +31,9 @@ export async function getDiscordUser(accessToken: string): Promise<DiscordUser> 
     return {
       id: user.id,
       username: user.username,
-      discriminator: user.discriminator,
-      avatar: user.avatar,
-      email: user.email
+      discriminator: user.discriminator || '',
+      avatar: user.avatar || null,
+      email: user.email || undefined
     };
   } catch (error) {
     throw new Error('Failed to fetch Discord user');
@@ -50,9 +50,9 @@ export async function getUserGuilds(accessToken: string): Promise<DiscordGuild[]
     return guilds.map(guild => ({
       id: guild.id,
       name: guild.name,
-      icon: guild.icon,
-      owner: guild.owner,
-      permissions: guild.permissions,
+      icon: guild.icon || null,
+      owner: guild.owner || false,
+      permissions: guild.permissions || '',
       features: guild.features,
       hasBot: true // This should be checked against bot's guild cache
     }));
@@ -67,7 +67,13 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
   expires_in: number;
 }> {
   try {
-    return await discordOAuth.refreshToken(refreshToken);
+    return await discordOAuth.tokenRequest({
+      clientId: botConfig.clientId!,
+      clientSecret: botConfig.clientSecret!,
+      grantType: 'refresh_token',
+      refreshToken: refreshToken,
+      scope: ['identify', 'guilds', 'email']
+    });
   } catch (error) {
     throw new Error('Failed to refresh access token');
   }

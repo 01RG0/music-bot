@@ -259,6 +259,11 @@ export class QueueManager extends EventEmitter {
     await this.saveQueue(guildId, { autoplay: enabled });
   }
 
+  // Update playing status
+  async setPlayingStatus(guildId: string, isPlaying: boolean): Promise<void> {
+    await this.saveQueue(guildId, { isPlaying });
+  }
+
   // Search and add tracks
   async searchAndAdd(
     guildId: string,

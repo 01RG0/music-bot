@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, GuildMember, EmbedBuilder } from 'discord.js';
-import { Track } from '@types/index';
+import { Track } from '../../../shared/types/src/index';
 import { GuildSettingsModel } from '@utils/schemas';
 
 export const playCommand = {
@@ -22,7 +22,7 @@ export const playCommand = {
 
       // Check permissions
       const settings = await GuildSettingsModel.findOne({ guildId });
-      if (settings?.permissions?.play?.length > 0) {
+      if (settings?.permissions?.play && settings.permissions.play.length > 0) {
         const hasPermission = settings.permissions.play.some(roleId =>
           member.roles.cache.has(roleId)
         );
@@ -52,7 +52,6 @@ export const playCommand = {
       }
 
       const query = interaction.options.getString('query', true);
-      const guildId = interaction.guildId!;
 
       // Check bot permissions
       const botPermissions = voiceChannel.permissionsFor(interaction.guild!.members.me!);
@@ -102,7 +101,7 @@ export const playCommand = {
 
       if (shouldStartPlaying) {
         await global.playerManager.playTrack(guildId, tracks[0]);
-        await global.queueManager.saveQueue(guildId, { isPlaying: true });
+        await global.queueManager.setPlayingStatus(guildId, true);
       }
 
       // Create response embed

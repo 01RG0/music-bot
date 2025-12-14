@@ -39,11 +39,10 @@ export class PlayerManager extends EventEmitter {
       password: lavalinkConfig.password,
       secure: lavalinkConfig.secure
     }], {
-      shards: 1,
-      send: (id: string, payload: any) => {
-        // This will be overridden by the bot
-        this.emit('sendPacket', id, payload);
-      }
+      shards: 1
+    }, (id: string, payload: any) => {
+      // Send function will be handled by the bot
+      this.emit('sendPacket', id, payload);
     });
 
     // Connect to WebSocket server if provided
