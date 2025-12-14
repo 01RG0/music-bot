@@ -1,0 +1,26 @@
+{
+  "name": "discord-music-bot-monorepo",
+  "version": "1.0.0",
+  "description": "Full production-ready Discord music bot with real-time web dashboard",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "shared/*"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "build": "npm run build --workspaces",
+    "dev": "concurrently \"npm run dev --workspace=apps/bot\" \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
+    "start": "concurrently \"npm run start --workspace=apps/bot\" \"npm run start --workspace=apps/api\" \"npm run start --workspace=apps/web\"",
+    "lint": "npm run lint --workspaces",
+    "clean": "npm run clean --workspaces && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
