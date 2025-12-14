@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { apiConfig } from '@music/config';
 import { UserModel } from '@utils/schemas';
+import { SecurityManager } from './utils/security';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -10,35 +11,43 @@ interface AuthenticatedSocket extends Socket {
 }
 
 export function setupWebSocketServer(io: Server) {
-  // Authentication middleware
-  io.use(async (socket: AuthenticatedSocket, next) => {
-    try {
-      const token = socket.handshake.auth.token;
+// Authentication middleware
+io.use(async (socket: AuthenticatedSocket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
 
-      if (!token) {
-        return next(new Error('Authentication token required'));
-      }
-
-      // Verify JWT token
-      const decoded = jwt.verify(token, apiConfig.jwtSecret) as any;
-
-      // Verify user exists
-      const user = await UserModel.findOne({ discordId: decoded.discordId });
-      if (!user) {
-        return next(new Error('User not found'));
-      }
-
-      // Attach user info to socket
-      socket.userId = user._id.toString();
-      socket.discordId = decoded.discordId;
-      socket.guilds = user.guilds;
-
-      next();
-    } catch (error) {
-      console.error('WebSocket authentication error:', error);
-      next(new Error('Authentication failed'));
+    if (!token) {
+      return next(new Error('Authentication token required'));
     }
-  });
+
+    // Verify JWT token
+    const decoded = jwt.verify(token, apiConfig.jwtSecret) as any;
+
+    // Verify user exists
+    const user = await UserModel.findOne({ discordId: decoded.discordId });
+    if (!user) {
+      return next(new Error('User not found'));
+    }
+
+    // Check if token is expired
+    if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+      return next(new Error('Token expired'));
+    }
+
+    // Attach user info to socket
+    socket.userId = user._id.toString();
+    socket.discordId = decoded.discordId;
+    socket.guilds = user.guilds;
+
+    // Log connection for monitoring
+    console.log(`🔐 WebSocket authenticated: ${socket.id} (${decoded.discordId})`);
+
+    next();
+  } catch (error) {
+    console.error('WebSocket authentication error:', error);
+    next(new Error('Authentication failed'));
+  }
+});
 
   io.on('connection', (socket: AuthenticatedSocket) => {
     console.log(`🔗 WebSocket connected: ${socket.id} (User: ${socket.discordId})`);
@@ -75,7 +84,55 @@ export function setupWebSocketServer(io: Server) {
         return;
       }
 
+      // Validate query
+      if (!data.query || data.query.trim().length === 0) {
+        socket.emit('web:play:response', {
+          success: false,
+          error: 'Query cannot be empty'
+        });
+        return;
+      }
+
       try {
+        // Check permissions and cooldowns
+        const permission = await SecurityManager.checkCommandPermission(
+          socket.discordId!,
+          data.guildId,
+          'play'
+        );
+
+        if (!permission.allowed) {
+          socket.emit('web:play:response', {
+            success: false,
+            error: 'Permission denied'
+          });
+          return;
+        }
+
+        const cooldown = SecurityManager.checkCooldown(
+          socket.discordId!,
+          data.guildId,
+          'play',
+          3000
+        );
+
+        if (!cooldown.allowed) {
+          socket.emit('web:play:response', {
+            success: false,
+            error: `Command on cooldown. Try again in ${Math.ceil((cooldown.remainingTime || 0) / 1000)} seconds.`
+          });
+          return;
+        }
+
+        const spamCheck = SecurityManager.checkSpam(socket.discordId!);
+        if (spamCheck.isSpam) {
+          socket.emit('web:play:response', {
+            success: false,
+            error: 'Too many requests. Please slow down.'
+          });
+          return;
+        }
+
         const tracks = await global.queueManager.searchAndAdd(
           data.guildId,
           data.query,

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, GuildMember, EmbedBuilder } from 'discord.js';
 import { Track } from '@types/index';
+import { GuildSettingsModel } from '@utils/schemas';
 
 export const playCommand = {
   data: new SlashCommandBuilder()
@@ -17,6 +18,26 @@ export const playCommand = {
 
     try {
       const member = interaction.member as GuildMember;
+      const guildId = interaction.guildId!;
+
+      // Check permissions
+      const settings = await GuildSettingsModel.findOne({ guildId });
+      if (settings?.permissions?.play?.length > 0) {
+        const hasPermission = settings.permissions.play.some(roleId =>
+          member.roles.cache.has(roleId)
+        );
+        if (!hasPermission && !member.permissions.has('Administrator')) {
+          return await interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor('#FF0000')
+                .setTitle('❌ Permission Denied')
+                .setDescription('You do not have permission to use the play command.')
+            ]
+          });
+        }
+      }
+
       const voiceChannel = member.voice.channel;
 
       if (!voiceChannel) {

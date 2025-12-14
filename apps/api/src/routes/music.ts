@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireGuildAccess } from '../middleware/auth';
 import { musicRateLimiter } from '../middleware/rateLimiter';
+import { requireCommandPermission, requireCooldown, antiSpam, validateTrackQuery } from '../utils/security';
 
 const router = Router();
 
@@ -41,7 +42,13 @@ router.get('/:guildId/player', requireGuildAccess, async (req, res) => {
 });
 
 // Play track
-router.post('/:guildId/play', requireGuildAccess, async (req, res) => {
+router.post('/:guildId/play',
+  requireGuildAccess,
+  requireCommandPermission('play'),
+  requireCooldown('play'),
+  antiSpam,
+  validateTrackQuery,
+  async (req, res) => {
   try {
     const { guildId } = req.params;
     const { query } = req.body;
@@ -93,7 +100,11 @@ router.post('/:guildId/play', requireGuildAccess, async (req, res) => {
 });
 
 // Control playback
-router.post('/:guildId/control/:action', requireGuildAccess, async (req, res) => {
+router.post('/:guildId/control/:action',
+  requireGuildAccess,
+  requireCommandPermission('skip'), // Use skip permission for all controls
+  requireCooldown('control'),
+  async (req, res) => {
   try {
     const { guildId, action } = req.params;
 
@@ -133,7 +144,11 @@ router.post('/:guildId/control/:action', requireGuildAccess, async (req, res) =>
 });
 
 // Set volume
-router.post('/:guildId/volume', requireGuildAccess, async (req, res) => {
+router.post('/:guildId/volume',
+  requireGuildAccess,
+  requireCommandPermission('volume'),
+  requireCooldown('volume', 1000),
+  async (req, res) => {
   try {
     const { guildId } = req.params;
     const { volume } = req.body;
@@ -271,7 +286,13 @@ router.get('/:guildId/queue', requireGuildAccess, async (req, res) => {
 });
 
 // Add to queue
-router.post('/:guildId/queue', requireGuildAccess, async (req, res) => {
+router.post('/:guildId/queue',
+  requireGuildAccess,
+  requireCommandPermission('play'),
+  requireCooldown('queue'),
+  antiSpam,
+  validateTrackQuery,
+  async (req, res) => {
   try {
     const { guildId } = req.params;
     const { query, position } = req.body;
